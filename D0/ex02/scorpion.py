@@ -6,16 +6,17 @@ import customtkinter
 from tkinter import filedialog
 from PIL import Image
 import piexif
+from iptcinfo3 import IPTCInfo
 import argparse
+from datetime import datetime
 
 def main():
 	args = parse_program_arguments()
-	if args.gui:
+	if args.gui: # BONUS DAY
 		gui_scorpion(args.files)
 	if len(args.files) != 0:
-		metada = get_metadata(args.files)
-		for key, value in metada.items():
-			print(f"{key}: {value}")
+		metadata = get_metadata(args.files)
+		display_metadata_list(metadata)
 	sys.exit(0)
 
 def get_metadata(files):
@@ -25,27 +26,52 @@ def get_metadata(files):
 
 		metadata = {}
 
-	# infos fichier
-	metadata["Filename"] = os.path.basename(file)
-	metadata["Filesize"] = os.path.getsize(file)
-	metadata["Filetype"] = img.format
-	metadata["ImageSize"] = f"{img.width}x{img.height}"
-	metadata["Mode"] = img.mode
+		# infos fichier
+		metadata["Filename"] = os.path.basename(file)
+		metadata["Filesize"] = os.path.getsize(file)
+		metadata["Filetype"] = img.format
+		metadata["Modified"] = datetime.fromtimestamp(os.path.getmtime(file)).strftime("%Y:%m:%d %H:%M:%S")
+		metadata["ImageSize"] = f"{img.width}x{img.height}"
+		metadata["Mode"] = img.mode
 
-	# EXIF standard via piexif
-	raw = img.info.get("exif", b"")
-	if raw:
-		exif = piexif.load(raw)
-		for ifd in ["0th", "Exif", "GPS"]:
-			for tag, val in exif.get(ifd, {}).items():
-				name = piexif.TAGS[ifd][tag]["name"]
-				if isinstance(val, bytes):
-					try:    val = val.decode("utf-8").strip("\x00")
-					except: val = val.hex()
-				metadata[name] = val
-	return metadata
+		# EXIF standard via piexif
+		raw = img.info.get("exif", b"")
+		if raw:
+			exif = piexif.load(raw)
+			for ifd in ["0th", "Exif", "GPS", "1st, Interop"]:
+				for tag, val in exif.get(ifd, {}).items():
+					name = piexif.TAGS[ifd][tag]["name"]
+					if isinstance(val, bytes):
+						try:    val = val.decode("utf-8").strip("\x00")
+						except: val = val.hex()
+					metadata[name] = val
+	
+		# IPCT INfo
+		try:
+			iptc = IPTCInfo(file)
+			if iptc:
+				for key, value in iptc.data.items():
+					if value:
+						metadata[f"{key}"] = value
+		except: pass
+
+		# PIL
+		
+
+		metadata_list.append(metadata)
+	return metadata_list
+
+def display_metadata_list(list):
+	for i, metadata in enumerate(list):
+		print("=========================\n"
+			f"Images {i} \n"
+			"=========================")
+		for key, value in metadata.items():
+			print(f"{key}: {value}")
+		i = i + 1
 
 
+# BONUS DAYS
 def parse_program_arguments():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("files", nargs='*', help="./scorpion FILE1 [FILE2 ...]")
@@ -59,6 +85,7 @@ def gui_scorpion(files):
 	app.title("Scorpion GUI")
 	app.geometry("1600x700")
 	signal.signal(signal.SIGINT, lambda sig, frame: app.destroy())
+
 
 	# left panel
 	left_frame = customtkinter.CTkFrame(app, width=300, fg_color="gray20")
