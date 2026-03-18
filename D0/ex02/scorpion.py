@@ -114,8 +114,10 @@ def gui_scorpion(files):
 				text=os.path.basename(file), 
 				image=ctk_img,
 				compound="top",
-				wraplength=260)
+				wraplength=260,
+				cursor="hand2")
 			label.image = ctk_img
+			label.bind("<Button-1>", lambda event: show_image_and_metadata(file))
 			label.pack(pady=5, fill="x")
 			app.update()
 		except:
@@ -135,6 +137,19 @@ def gui_scorpion(files):
 		for root, dirs, filenames in os.walk(folder):
 			for filename in filenames:
 					add_thumbnail(os.path.join(root, filename))
+
+	def show_image_and_metadata(file_path):
+		try:
+			img = Image.open(file_path)
+			# Redimensionner pour tenir dans le panel (max 400x600)
+			img.thumbnail((400, 600))
+			display_img = customtkinter.CTkImage(light_image=img, size=(img.width, img.height))
+			
+			# Mettre à jour le preview_label
+			preview_label.configure(image=display_img, text="")
+			preview_label.image = display_img  # Garde une référence
+		except Exception as e:
+			preview_label.configure(text=f"Erreur: {e}", image=None)
 
 	# add buttons and link with nested functions
 	uploadfiles_button = customtkinter.CTkButton(left_frame, text="Upload Files", command=add_files)
